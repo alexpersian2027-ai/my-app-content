@@ -3,30 +3,671 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>اپ مجید من</title>
+    <title>طلسم پارس | بازی هخامنشی</title>
     <style>
+        @import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css');
+
         body {
-            font-family: Tahoma, sans-serif;
-            padding: 20px;
-            background: #f0f0f0;
-            text-align: center;
+            margin: 0;
+            overflow: hidden;
+            background-color: #0b1021;
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            color: #fff;
+            user-select: none;
         }
-        h1 { color: #2c3e50; }
-        .box {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 20px auto;
-            max-width: 500px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+
+        /* پس‌زمینه باشکوه هخامنشی */
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: radial-gradient(circle at center, #1a2a6c, #112240, #0b1021);
+        }
+
+        /* الگوی هندسی پس‌زمینه */
+        #game-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                linear-gradient(45deg, #d4af3705 25%, transparent 25%, transparent 75%, #d4af3705 75%, #d4af3705),
+                linear-gradient(45deg, #d4af3705 25%, transparent 25%, transparent 75%, #d4af3705 75%, #d4af3705);
+            background-size: 60px 60px;
+            background-position: 0 0, 30px 30px;
+            pointer-events: none;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* رابط کاربری مدرن */
+        #ui-layer {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .ui-box {
+            background: rgba(26, 42, 108, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            border-radius: 15px;
+            padding: 10px 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .ui-text {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #d4af37;
+        }
+
+        .ui-value {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.8);
+        }
+
+        #game-over {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(11, 16, 33, 0.95);
+            border: 2px solid #d4af37;
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            z-index: 20;
+            display: none;
+            box-shadow: 0 0 50px rgba(212, 175, 55, 0.5);
+        }
+
+        #game-over h1 {
+            color: #d4af37;
+            margin-bottom: 20px;
+            font-size: 2.5rem;
+        }
+
+        #game-over p {
+            font-size: 1.5rem;
+            margin-bottom: 30px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #d4af37, #f39c12);
+            color: #0b1021;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 50px;
+            cursor: pointer;
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+
+        .btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(212, 175, 55, 0.8);
         }
     </style>
 </head>
 <body>
-    <h1>سلام! این اپ منه 🎉</h1>
-    <div class="box">
-        <p>این متن رو هر وقتیی خواستم می‌تونم عوض کنم.</p>
-        <p>فقط کافیه این فایل رو توی گیت‌هاب ویرایش کنم.</p>
+    <div id="game-container">
+        <div id="ui-layer">
+            <div class="ui-box">
+                <span class="ui-text">امتیاز:</span>
+                <span class="ui-value" id="score-display">0</span>
+            </div>
+            <div class="ui-box">
+                <span class="ui-text">مرحله:</span>
+                <span class="ui-value" id="level-display">1</span>
+            </div>
+            <div class="ui-box">
+                <span class="ui-text">توپ‌های باقی‌مانده:</span>
+                <span class="ui-value" id="balls-display">0</span>
+            </div>
+        </div>
+        
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="game-over">
+            <h1>پایان بازی!</h1>
+            <p>امتیاز نهایی شما: <span id="final-score">0</span></p>
+            <button class="btn" onclick="restartGame()">بازی مجدد</button>
+        </div>
     </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        // تنظیمات اندازه صفحه
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- متغیرهای بازی ---
+        const COLORS = [
+            { name: 'Lapis', base: '#1e3c72', light: '#4a7bc8', dark: '#0a1833' }, // لاپیس‌لاجوردی
+            { name: 'Turquoise', base: '#00b4d8', light: '#90e0ef', dark: '#005f73' }, // فیروزه‌ای
+            { name: 'Gold', base: '#d4af37', light: '#f9e076', dark: '#8a6d1c' }, // طلایی
+            { name: 'Ruby', base: '#c1121f', light: '#ff4d4d', dark: '#660000' }, // یاقوتی
+            { name: 'Purple', base: '#7209b7', light: '#b5179e', dark: '#3a0ca3' } // بنفش سلطنتی
+        ];
+
+        let balls = [];
+        let projectiles = [];
+        let shooter = { x: 0, y: 0, angle: 0, currentColor: 0, radius: 25 };
+        let pathPoints = [];
+        let pathLength = 0;
+        let score = 0;
+        let level = 1;
+        let ballsToSpawn = 40;
+        let spawnTimer = 0;
+        let gameOver = false;
+        let mouseX = 0, mouseY = 0;
+        let chainSpeed = 0.5;
+
+        // --- ساخت مسیر حرکت توپ‌ها (پیچ و خم هخامنشی) ---
+        function generatePath() {
+            pathPoints = [];
+            const margin = 150;
+            // یک مسیر مارپیچ زیبا
+            pathPoints.push({ x: width + 50, y: height / 2 });
+            pathPoints.push({ x: width - margin, y: height / 2 });
+            pathPoints.push({ x: width - margin, y: height - margin });
+            pathPoints.push({ x: margin, y: height - margin });
+            pathPoints.push({ x: margin, y: margin });
+            pathPoints.push({ x: width - margin, y: margin });
+            pathPoints.push({ x: width - margin, y: height / 2 + 100 });
+            pathPoints.push({ x: margin + 100, y: height / 2 + 100 });
+            pathPoints.push({ x: margin + 100, y: margin + 150 });
+            pathPoints.push({ x: width / 2, y: margin + 150 });
+            pathPoints.push({ x: width / 2, y: height / 2 }); // نقطه پایان (دروازه)
+
+            // محاسبه طول کل مسیر
+            pathLength = 0;
+            for (let i = 0; i < pathPoints.length - 1; i++) {
+                let dx = pathPoints[i+1].x - pathPoints[i].x;
+                let dy = pathPoints[i+1].y - pathPoints[i].y;
+                pathLength += Math.sqrt(dx*dx + dy*dy);
+            }
+        }
+
+        // --- کلاس توپ ---
+        class Ball {
+            constructor(colorIndex, distanceTravelled = 0) {
+                this.colorIndex = colorIndex;
+                this.distance = distanceTravelled;
+                this.radius = 22;
+                this.x = 0;
+                this.y = 0;
+                this.isMatched = false;
+            }
+
+            updatePosition() {
+                let dist = this.distance;
+                for (let i = 0; i < pathPoints.length - 1; i++) {
+                    let p1 = pathPoints[i];
+                    let p2 = pathPoints[i+1];
+                    let dx = p2.x - p1.x;
+                    let dy = p2.y - p1.y;
+                    let segmentLength = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (dist <= segmentLength) {
+                        let t = dist / segmentLength;
+                        this.x = p1.x + dx * t;
+                        this.y = p1.y + dy * t;
+                        return;
+                    }
+                    dist -= segmentLength;
+                }
+                // اگر از مسیر خارج شد
+                this.x = pathPoints[pathPoints.length-1].x;
+                this.y = pathPoints[pathPoints.length-1].y;
+            }
+
+            draw() {
+                this.updatePosition();
+                const color = COLORS[this.colorIndex];
+                
+                // افکت سه‌بعدی با گرادیانت
+                const gradient = ctx.createRadialGradient(
+                    this.x - this.radius/3, this.y - this.radius/3, this.radius/10,
+                    this.x, this.y, this.radius
+                );
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(0.2, color.light);
+                gradient.addColorStop(0.7, color.base);
+                gradient.addColorStop(1, color.dark);
+
+                // سایه
+                ctx.beginPath();
+                ctx.arc(this.x + 3, this.y + 5, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fill();
+
+                // بدنه توپ
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                // هایلایت براق
+                ctx.beginPath();
+                ctx.arc(this.x - this.radius/3, this.y - this.radius/3, this.radius/4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.fill();
+
+                // نشان هخامنشی روی توپ (یک ستاره ساده)
+                ctx.beginPath();
+                for(let i=0; i<5; i++) {
+                    let angle = (i * 72 - 90) * Math.PI / 180;
+                    let sx = this.x + Math.cos(angle) * (this.radius * 0.4);
+                    let sy = this.y + Math.sin(angle) * (this.radius * 0.4);
+                    if(i===0) ctx.moveTo(sx, sy);
+                    else ctx.lineTo(sx, sy);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+            }
+        }
+
+        // --- کلاس پرتابه (گلوله شلیک شده) ---
+        class Projectile {
+            constructor(x, y, angle, colorIndex) {
+                this.x = x;
+                this.y = y;
+                this.vx = Math.cos(angle) * 15;
+                this.vy = Math.sin(angle) * 15;
+                this.colorIndex = colorIndex;
+                this.radius = 22;
+                this.active = true;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                
+                // برخورد با دیواره‌ها
+                if (this.x < 0 || this.x > width || this.y < 0 || this.y > height) {
+                    this.active = false;
+                }
+            }
+
+            draw() {
+                const color = COLORS[this.colorIndex];
+                const gradient = ctx.createRadialGradient(
+                    this.x - this.radius/3, this.y - this.radius/3, this.radius/10,
+                    this.x, this.y, this.radius
+                );
+                gradient.addColorStop(0, '#ffffff');
+                gradient.addColorStop(0.2, color.light);
+                gradient.addColorStop(0.7, color.base);
+                gradient.addColorStop(1, color.dark);
+
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(this.x - this.radius/3, this.y - this.radius/3, this.radius/4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255,255,255,0.6)';
+                ctx.fill();
+            }
+        }
+
+        // --- رسم پرتاب‌کننده (فرّ ایزدی هخامنشی) ---
+        function drawShooter() {
+            ctx.save();
+            ctx.translate(shooter.x, shooter.y);
+            ctx.rotate(shooter.angle);
+
+            // بال‌های فرّ ایزدی
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(-40, -30, -70, 0);
+            ctx.quadraticCurveTo(-40, 30, 0, 0);
+            ctx.fillStyle = '#d4af37';
+            ctx.fill();
+            ctx.strokeStyle = '#8a6d1c';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.quadraticCurveTo(-40, 30, -70, 0);
+            ctx.quadraticCurveTo(-40, -30, 0, 0);
+            ctx.fillStyle = '#d4af37';
+            ctx.fill();
+            ctx.stroke();
+
+            // بدنه پرتاب‌کننده
+            ctx.beginPath();
+            ctx.arc(0, 0, 30, 0, Math.PI * 2);
+            ctx.fillStyle = '#112240';
+            ctx.fill();
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // توپ داخل پرتاب‌کننده
+            const color = COLORS[shooter.currentColor];
+            const gradient = ctx.createRadialGradient(-5, -5, 5, 0, 0, 20);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.3, color.light);
+            gradient.addColorStop(1, color.dark);
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, 20, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // نشانه روی توپ
+            ctx.beginPath();
+            ctx.moveTo(30, 0);
+            ctx.lineTo(50, 0);
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- رسم دروازه پایان (دروازه ملل) ---
+        function drawGate() {
+            const endPoint = pathPoints[pathPoints.length - 1];
+            ctx.save();
+            ctx.translate(endPoint.x, endPoint.y);
+            
+            // ستون‌های هخامنشی
+            ctx.fillStyle = '#d4af37';
+            ctx.fillRect(-40, -50, 15, 100);
+            ctx.fillRect(25, -50, 15, 100);
+            
+            // سرستون‌ها (شبیه گاو بالدار)
+            ctx.beginPath();
+            ctx.arc(-32, -50, 15, 0, Math.PI * 2);
+            ctx.arc(32, -50, 15, 0, Math.PI * 2);
+            ctx.fill();
+
+            // دروازه
+            ctx.fillStyle = '#112240';
+            ctx.fillRect(-25, -30, 50, 80);
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-25, -30, 50, 80);
+
+            // نقش فروهر روی دروازه
+            ctx.beginPath();
+            ctx.arc(0, 0, 10, 0, Math.PI * 2);
+            ctx.fillStyle = '#d4af37';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(20, -10);
+            ctx.lineTo(20, 10);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        // --- منطق بازی ---
+        function initGame() {
+            balls = [];
+            projectiles = [];
+            score = 0;
+            level = 1;
+            ballsToSpawn = 40;
+            gameOver = false;
+            document.getElementById('game-over').style.display = 'none';
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('level-display').innerText = level;
+            
+            generatePath();
+            shooter.x = width / 2;
+            shooter.y = height / 2;
+            shooter.currentColor = Math.floor(Math.random() * COLORS.length);
+
+            // تولید توپ‌های اولیه
+            for (let i = 0; i < 15; i++) {
+                let color = Math.floor(Math.random() * COLORS.length);
+                balls.push(new Ball(color, -i * 45)); // فاصله بین توپ‌ها
+            }
+            ballsToSpawn -= 15;
+            
+            updateUI();
+        }
+
+        function updateUI() {
+            document.getElementById('score-display').innerText = score;
+            document.getElementById('level-display').innerText = level;
+            document.getElementById('balls-display').innerText = balls.length + ballsToSpawn;
+        }
+
+        // --- شلیک ---
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            shooter.angle = Math.atan2(mouseY - shooter.y, mouseX - shooter.x);
+        });
+
+        canvas.addEventListener('click', () => {
+            if (gameOver) return;
+            projectiles.push(new Projectile(
+                shooter.x, shooter.y, shooter.angle, shooter.currentColor
+            ));
+            shooter.currentColor = Math.floor(Math.random() * COLORS.length);
+        });
+
+        // --- بررسی برخورد و انفجار ---
+        function checkCollisions() {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                let p = projectiles[i];
+                if (!p.active) {
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+
+                for (let j = 0; j < balls.length; j++) {
+                    let b = balls[j];
+                    let dx = p.x - b.x;
+                    let dy = p.y - b.y;
+                    let dist = Math.sqrt(dx*dx + dy*dy);
+
+                    if (dist < p.radius + b.radius - 5) {
+                        p.active = false;
+                        // درج توپ در زنجیره
+                        let newBall = new Ball(p.colorIndex, b.distance);
+                        // تنظیم فاصله دقیق برای درج
+                        balls.splice(j, 0, newBall);
+                        
+                        // اصلاح فاصله توپ‌های بعدی
+                        for (let k = j + 1; k < balls.length; k++) {
+                            balls[k].distance += 45; 
+                        }
+                        
+                        checkMatches(j);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // --- بررسی توپ‌های هم‌رنگ ---
+        function checkMatches(startIndex) {
+            let color = balls[startIndex].colorIndex;
+            let matchIndices = [startIndex];
+
+            // بررسی به سمت راست (جلوتر در مسیر)
+            for (let i = startIndex + 1; i < balls.length; i++) {
+                if (balls[i].colorIndex === color) matchIndices.push(i);
+                else break;
+            }
+
+            // بررسی به سمت چپ (عقب‌تر در مسیر)
+            for (let i = startIndex - 1; i >= 0; i--) {
+                if (balls[i].colorIndex === color) matchIndices.unshift(i);
+                else break;
+            }
+
+            if (matchIndices.length >= 3) {
+                // انفجار توپ‌ها
+                score += matchIndices.length * 100;
+                
+                // حذف توپ‌ها از انتها به ابتدا برای جلوگیری از جابجایی ایندکس
+                for (let i = matchIndices.length - 1; i >= 0; i--) {
+                    balls.splice(matchIndices[i], 1);
+                }
+                
+                // جابجایی توپ‌های باقی‌مانده به سمت جلو (فشرده شدن زنجیره)
+                for (let i = 0; i < balls.length; i++) {
+                    if (i > 0) {
+                        let prevBall = balls[i-1];
+                        let currentBall = balls[i];
+                        // اگر فاصله زیاد شد، توپ‌ها را به هم نزدیک کن
+                        if (currentBall.distance - prevBall.distance > 45) {
+                            currentBall.distance = prevBall.distance + 45;
+                        }
+                    }
+                }
+                updateUI();
+            }
+        }
+
+        // --- حلقه اصلی بازی ---
+        function gameLoop() {
+            if (gameOver) return;
+
+            // پاک کردن صفحه
+            ctx.clearRect(0, 0, width, height);
+
+            // رسم دروازه پایان
+            drawGate();
+
+            // رسم مسیر (جاده ابریشم)
+            ctx.beginPath();
+            ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+            for (let i = 1; i < pathPoints.length; i++) {
+                ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+            }
+            ctx.strokeStyle = 'rgba(212, 175, 55, 0.2)';
+            ctx.lineWidth = 50;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(212, 175, 55, 0.5)';
+            ctx.lineWidth = 4;
+            ctx.stroke();
+
+            // حرکت توپ‌ها
+            for (let i = 0; i < balls.length; i++) {
+                balls[i].distance += chainSpeed;
+                
+                // بررسی برخورد با دروازه (باخت)
+                if (balls[i].distance >= pathLength) {
+                    gameOver = true;
+                    document.getElementById('final-score').innerText = score;
+                    document.getElementById('game-over').style.display = 'block';
+                    return;
+                }
+            }
+
+            // بررسی فاصله توپ‌ها و فشرده شدن
+            for (let i = 1; i < balls.length; i++) {
+                let prev = balls[i-1];
+                let curr = balls[i];
+                if (curr.distance - prev.distance < 45) {
+                    // اگر توپ‌ها روی هم افتادند، عقب‌ترها را هل بده
+                    curr.distance = prev.distance + 45;
+                }
+            }
+
+            // تولید توپ‌های جدید
+            if (ballsToSpawn > 0 && balls.length > 0) {
+                spawnTimer++;
+                if (spawnTimer > 60) { // هر ۶۰ فریم یک توپ جدید
+                    let lastBall = balls[balls.length - 1];
+                    if (lastBall.distance > 45) {
+                        let color = Math.floor(Math.random() * COLORS.length);
+                        balls.push(new Ball(color, 0));
+                        ballsToSpawn--;
+                        spawnTimer = 0;
+                        updateUI();
+                    }
+                }
+            }
+
+            // رسم توپ‌ها
+            for (let b of balls) {
+                b.draw();
+            }
+
+            // به‌روزرسانی و رسم پرتابه‌ها
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                projectiles[i].update();
+                projectiles[i].draw();
+            }
+
+            // بررسی برخوردها
+            checkCollisions();
+
+            // رسم پرتاب‌کننده
+            drawShooter();
+
+            // بررسی برد
+            if (balls.length === 0 && ballsToSpawn === 0) {
+                level++;
+                ballsToSpawn = 40 + level * 10;
+                for (let i = 0; i < 15; i++) {
+                    let color = Math.floor(Math.random() * COLORS.length);
+                    balls.push(new Ball(color, -i * 45));
+                }
+                ballsToSpawn -= 15;
+                chainSpeed += 0.1;
+                updateUI();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function restartGame() {
+            initGame();
+            gameLoop();
+        }
+
+        // شروع بازی
+        initGame();
+        gameLoop();
+
+    </script>
 </body>
 </html>
